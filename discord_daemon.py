@@ -385,7 +385,7 @@ class TeamDiscordDaemon:
                     hb_interval = hello["d"]["heartbeat_interval"] / 1000.0
                     hb_task = asyncio.create_task(self._heartbeat_loop(ws, hb_interval))
 
-                    # 2. Send IDENTIFY (op=2) with visible Online presence
+                    # 2. Send IDENTIFY (op=2) with Discord Gateway v10 valid Online presence
                     identify = {
                         "op": 2,
                         "d": {
@@ -393,11 +393,12 @@ class TeamDiscordDaemon:
                             "intents": GATEWAY_INTENTS,
                             "properties": {"os": "windows", "browser": "team-discord-mcp", "device": "team-discord-mcp"},
                             "presence": {
+                                "since": None,
                                 "status": "online",
                                 "afk": False,
                                 "activities": [
                                     {
-                                        "name": f"{self.settings.agent_name} · Gemini Decision Router",
+                                        "name": f"{self.settings.agent_name} · Team AI",
                                         "type": 3,
                                     }
                                 ],
@@ -423,6 +424,16 @@ class TeamDiscordDaemon:
                                 u = d.get("user") or {}
                                 self.bot_user_id = str(u.get("id", ""))
                                 log(f"CONNECTED to Discord Gateway as {u.get('username')} ({self.bot_user_id})")
+                                # Explicitly push op=3 Presence Update so Discord shows green Online dot immediately
+                                await ws.send(json.dumps({
+                                    "op": 3,
+                                    "d": {
+                                        "since": None,
+                                        "status": "online",
+                                        "afk": False,
+                                        "activities": [{"name": f"{self.settings.agent_name} · Team AI", "type": 3}],
+                                    },
+                                }))
                             elif t == "MESSAGE_CREATE":
                                 asyncio.create_task(self.handle_message_create(d))
                         elif op == 7:  # RECONNECT
