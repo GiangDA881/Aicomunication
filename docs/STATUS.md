@@ -78,3 +78,14 @@ process, not a real container restart.
   modal or the REST endpoint is the better path for production.
 - Per-user (as opposed to per-agent) budgets; rate limiting on the REST API.
 - Load, concurrency and chaos tests beyond the concurrency limit check.
+
+## v0.2: AgentHub Local (serverless, Discord as the shared server)
+
+Tested (13 tests in `tests/local`, against an in-memory Discord API): channel setup, human-only
+verification (bots and non-maintainers ignored), supersede + drift, task claim races, handoff
+gating by maintainer ✅/❌, sealed debate round 0, round limits and deadline, hop limit, upload
+guard, inbox, notification escaping, wake rate limit, MCP tool calls. The MCP server was also
+started over stdio and listed its 16 tools.
+
+Not verified against real Discord (no bot token in the build environment): gateway daemon,
+REST calls in production, forum/thread permissions. Desktop notifications not run on Windows.
