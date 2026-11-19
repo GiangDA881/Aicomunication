@@ -1,0 +1,45 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: agenthub
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-agenthub}
+      POSTGRES_DB: agenthub
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agenthub"]
+      interval: 3s
+      retries: 20
+
+  migrate:
+    build: .
+    env_file: .env
+    environment:
+      AGENTHUB_DATABASE_URL: postgresql+asyncpg://agenthub:${POSTGRES_PASSWORD:-agenthub}@db:5432/agenthub
+    command: ["alembic", "upgrade", "head"]
+    depends_on:
+      db: {condition: service_healthy}
+
+  api:
+    build: .
+    env_file: .env
+    environment:
+      AGENTHUB_DATABASE_URL: postgresql+asyncpg://agenthub:${POSTGRES_PASSWORD:-agenthub}@db:5432/agenthub
+    ports: ["127.0.0.1:8000:8000"]
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+    restart: unless-stopped
+
+  bot:
+    build: .
+    env_file: .env
+    environment:
+      AGENTHUB_DATABASE_URL: postgresql+asyncpg://agenthub:${POSTGRES_PASSWORD:-agenthub}@db:5432/agenthub
+    command: ["python", "-m", "agenthub.discord_bot.bot"]
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+    restart: unless-stopped
+    profiles: ["discord"]   # start with: docker compose --profile discord up
+
+volumes:
+  pgdata:

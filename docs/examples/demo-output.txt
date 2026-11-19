@@ -1,0 +1,195 @@
+
+== Project demo-0b5c; A is maintainer, B and C are members
+
+== User A owns three agents on different models; B and C own one each
+
+== A tries to run B's agent -> Forbidden: agent.execute on agent ccae56f6c5e848b8807f30576441b72d is not permitted
+
+== Agent cites the old decision -> drift report
+{
+  "stale": true,
+  "referenced_version": 2,
+  "current_version": 3,
+  "outdated_records": [
+    {
+      "id": "bb7b3cf2103240c6b9ecaf984bb71c45",
+      "title": "Event bus",
+      "status": "superseded",
+      "replacement": {
+        "id": "5d0381c497244e37badf24db6eb4e67d",
+        "kind": "architecture",
+        "revision": 2,
+        "title": "Event bus",
+        "body": "Use Postgres with SKIP LOCKED.",
+        "tags": []
+      }
+    }
+  ],
+  "newer_verified": [
+    {
+      "id": "5d0381c497244e37badf24db6eb4e67d",
+      "kind": "architecture",
+      "revision": 2,
+      "title": "Event bus",
+      "body": "Use Postgres with SKIP LOCKED.",
+      "tags": []
+    }
+  ],
+  "unknown_records": []
+}
+
+== Two agents, same context version, independent answers
+{
+  "a-research": [
+    3,
+    "[A2-claude] ctx=3 turns=1 :: What does the bus use?"
+  ],
+  "b-arch": [
+    3,
+    "[B1] ctx=3 turns=1 :: What does the bus use?"
+  ]
+}
+
+== Approve on agent's word alone -> no verified passing evidence (agent claims alone are not enough)
+
+== AH-2 history
+[
+  {
+    "from": null,
+    "to": "backlog",
+    "by_user": "71900d5965aa407c8a8f0254eb0d60f4",
+    "by_agent": null,
+    "note": "created",
+    "at": "2026-11-19T03:51:20.525091+00:00"
+  },
+  {
+    "from": "backlog",
+    "to": "assigned",
+    "by_user": "71900d5965aa407c8a8f0254eb0d60f4",
+    "by_agent": null,
+    "note": "assigned to 1 agent(s)",
+    "at": "2026-11-19T03:51:20.528175+00:00"
+  },
+  {
+    "from": "assigned",
+    "to": "in_progress",
+    "by_user": "71900d5965aa407c8a8f0254eb0d60f4",
+    "by_agent": null,
+    "note": "",
+    "at": "2026-11-19T03:51:20.541503+00:00"
+  },
+  {
+    "from": "in_progress",
+    "to": "review",
+    "by_user": "71900d5965aa407c8a8f0254eb0d60f4",
+    "by_agent": "ccae56f6c5e848b8807f30576441b72d",
+    "note": "handoff submitted",
+    "at": "2026-11-19T03:51:20.546522+00:00"
+  },
+  {
+    "from": "review",
+    "to": "approved",
+    "by_user": "f393772f817c40dbae6faa941791b2eb",
+    "by_agent": null,
+    "note": "approved",
+    "at": "2026-11-19T03:51:20.560130+00:00"
+  },
+  {
+    "from": "approved",
+    "to": "completed",
+    "by_user": "f393772f817c40dbae6faa941791b2eb",
+    "by_agent": null,
+    "note": "",
+    "at": "2026-11-19T03:51:20.565546+00:00"
+  }
+]
+
+== Debate summary (awaiting human approval)
+{
+  "problem": "Should we add Redis now?",
+  "context_version": 3,
+  "participants": [
+    {
+      "agent_id": "0e1472dbdedd442a80328d52811f2196",
+      "name": "a-coder",
+      "role": "proposer",
+      "provider": "mock",
+      "model": "mock-gpt"
+    },
+    {
+      "agent_id": "ccae56f6c5e848b8807f30576441b72d",
+      "name": "b-arch",
+      "role": "critic",
+      "provider": "mock",
+      "model": "mock-1"
+    },
+    {
+      "agent_id": "0e7e948341bf4cee94c7fdbfd0f46118",
+      "name": "a-review",
+      "role": "verifier",
+      "provider": "mock",
+      "model": "mock-gemini"
+    },
+    {
+      "agent_id": "98567637693042eebad75705b0328162",
+      "name": "c-synth",
+      "role": "synthesizer",
+      "provider": "mock",
+      "model": "mock-1"
+    }
+  ],
+  "proposals": [
+    {
+      "agent": "a-coder",
+      "role": "proposer",
+      "text": "[A1-gpt] ctx=3 turns=1 :: DEBATE PROBLEM:\nShould we add Redis now?\n\nYour role: proposer. Propose a c"
+    },
+    {
+      "agent": "b-arch",
+      "role": "critic",
+      "text": "[B1] ctx=3 turns=1 :: DEBATE PROBLEM:\nShould we add Redis now?\n\nYour role: critic. Find the weakest "
+    },
+    {
+      "agent": "a-review",
+      "role": "verifier",
+      "text": "[A3-gemini] ctx=3 turns=1 :: DEBATE PROBLEM:\nShould we add Redis now?\n\nYour role: verifier. Identify"
+    }
+  ],
+  "failures": [],
+  "rounds_completed": 1,
+  "stop_reason": "max_rounds",
+  "budget": {
+    "tokens_used": 4252,
+    "tokens_limit": 60000,
+    "usd_used": 0.004823,
+    "usd_limit": 1.0
+  },
+  "synthesis_parsed": true,
+  "agreements": [
+    "Postgres is already required"
+  ],
+  "disagreements": [
+    {
+      "topic": "queue",
+      "positions": [
+        "Redis streams",
+        "Postgres SKIP LOCKED"
+      ]
+    }
+  ],
+  "uncertainties": [
+    "throughput above 1k events/s"
+  ],
+  "claims_to_verify": [
+    "SKIP LOCKED handles our load"
+  ],
+  "recommended_next_actions": [
+    "benchmark with 3 agents"
+  ],
+  "recommendation": "Postgres queue until load data says otherwise",
+  "synthesis_raw": null,
+  "note": "Agreement between agents is not evidence of correctness.",
+  "final_decision": null
+}
+
+== Approved -> verified decision f62e2a32ae9a4d77b54ff901965204e4; context now v4
