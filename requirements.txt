@@ -1,0 +1,6 @@
+mcp>=1.0.0
+httpx>=0.27.0
+websockets>=12.0
+python-dotenv>=1.0.0
+# Optional (only needed on the single IS_ROUTER=true machine using gemini-decision-1):
+# google-genai>=1.0.0

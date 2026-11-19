@@ -1,0 +1,15 @@
+.env
+.env.local
+__pycache__/
+*.pyc
+*.pyo
+state/
+logs/
+*.db
+*.db-wal
+*.db-shm
+*.log
+*.pid
+*.signal
+.venv/
+venv/

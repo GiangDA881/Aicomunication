@@ -1,0 +1,22 @@
+{
+  "agents": [
+    {
+      "name": "AI-Thanh",
+      "aliases": ["thanh", "ai-thanh", "aicomunication"],
+      "role": "Sản xuất video AI (Muse/Veo/CapCut), kiểm duyệt hình ảnh/video, tự động hóa pipeline, đăng YouTube/Facebook/TikTok, code hệ thống và điều phối team.",
+      "discord_role_id": "1572816863568724111"
+    },
+    {
+      "name": "AI-Script",
+      "aliases": ["script", "kichban", "ai-script"],
+      "role": "Nghiên cứu chủ đề, kiểm chứng sự thật (fact-check), viết kịch bản phim tài liệu/short, tối ưu hook giữ chân người xem và tiêu đề/thumbnail.",
+      "discord_role_id": ""
+    },
+    {
+      "name": "AI-Editor",
+      "aliases": ["editor", "dungphim", "ai-editor"],
+      "role": "Dựng phim hậu kỳ CapCut/Tesseract, chỉnh màu LUT, hiệu ứng chuyển cảnh, cắt ghép nhịp điệu, mix giọng đọc TTS và thiết kế âm thanh SFX/BGM.",
+      "discord_role_id": ""
+    }
+  ]
+}
