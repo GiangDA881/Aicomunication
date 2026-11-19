@@ -29,6 +29,7 @@ from config import (
     load_roster,
     load_settings,
     push_inbox_item,
+    resolve_workspace,
     set_agent_status,
 )
 from discord_api import DiscordRestClient
@@ -193,6 +194,7 @@ class TeamDiscordDaemon:
         reason: str,
         urgency: float,
     ) -> None:
+        ws = resolve_workspace(channel_id, content)
         inserted = push_inbox_item(
             message_id=msg_id,
             channel_id=channel_id,
@@ -201,10 +203,15 @@ class TeamDiscordDaemon:
             attachments=attachments,
             reason=reason,
             urgency=urgency,
+            project_id=ws["project_id"],
+            workspace_path=ws["workspace_path"],
         )
         if not inserted:
             return
-        log(f"WAKE [{self.settings.agent_name}] ({reason}, urgency={urgency}): {sender}: {content[:120]}")
+        log(
+            f"WAKE [{self.settings.agent_name}] ({reason}, urgency={urgency}, "
+            f"project={ws['project_id']} -> {ws['workspace_path']}): {sender}: {content[:120]}"
+        )
         # React 👀 on Discord so the team immediately sees the AI caught the notification
         self.rest.add_reaction(channel_id, msg_id, "👀")
         # Fire Windows Toast notification
@@ -212,7 +219,7 @@ class TeamDiscordDaemon:
             send_windows_toast(
                 title=f"Discord → {self.settings.agent_name} (từ {sender})",
                 body=content[:200] or "[Đính kèm file]",
-                subtitle=f"Lý do: {reason} · Ưu tiên {urgency:.1f}/5",
+                subtitle=f"Dự án: {ws['project_name']} · Ưu tiên {urgency:.1f}/5",
             )
 
     async def handle_message_create(self, data: Dict[str, Any]) -> None:

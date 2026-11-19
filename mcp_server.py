@@ -18,9 +18,12 @@ from mcp.server.fastmcp import FastMCP
 
 from config import (
     get_all_agent_statuses,
+    load_local_projects,
     load_roster,
     load_settings,
     pop_unread_inbox,
+    resolve_workspace,
+    save_local_projects,
     save_roster,
     set_agent_status,
 )
@@ -184,7 +187,86 @@ def discord_route_test(text: str, attachment_path: str = "", sender: str = "Than
         content=text,
         local_attachment_path=attachment_path or None,
     )
+    res["resolved_workspace"] = resolve_workspace(s.default_channel_id, text)
     return json.dumps(res, ensure_ascii=False, indent=2)
+
+
+@mcp.tool()
+def discord_projects(
+    action: str = "list",
+    project_id: str = "",
+    name: str = "",
+    path: str = "",
+    channel_ids: str = "",
+    aliases: str = "",
+    sample_text: str = "",
+) -> str:
+    """Manage local project workspace mappings (`local_projects.json`) on THIS machine.
+
+    Maps Discord channels or project aliases (e.g. '#web', 'youtube') to the exact local
+    directory path on this teammate's PC so every incoming Discord task includes `workspace_path`.
+
+    Args:
+        action: 'list', 'upsert', 'remove', 'set_default', or 'resolve'.
+        project_id: Short project ID (e.g. 'youtube', 'web').
+        name: Human-readable project name.
+        path: Absolute local folder path on this machine (e.g. 'D:\\Projects\\WebApp').
+        channel_ids: Comma-separated Discord channel IDs bound to this project.
+        aliases: Comma-separated keywords/aliases that route messages to this project.
+        sample_text: Used with action='resolve' to test which local folder a message maps to.
+    """
+    cfg = load_local_projects()
+    projects = cfg.get("projects") or []
+
+    if action == "list":
+        return json.dumps(cfg, ensure_ascii=False, indent=2)
+
+    if action == "set_default":
+        if not path.strip():
+            return json.dumps({"ok": False, "error": "'path' is required for set_default."})
+        cfg["default_workspace"] = path.strip()
+        save_local_projects(cfg)
+        return json.dumps({"ok": True, "default_workspace": cfg["default_workspace"]}, ensure_ascii=False)
+
+    if action == "resolve":
+        cid = channel_ids.split(",")[0].strip() if channel_ids else load_settings().default_channel_id
+        return json.dumps(resolve_workspace(cid, sample_text), ensure_ascii=False, indent=2)
+
+    if action == "upsert":
+        pid = project_id.strip().lower()
+        if not pid or not path.strip():
+            return json.dumps({"ok": False, "error": "Both 'project_id' and 'path' are required for upsert."})
+        ch_list = [c.strip() for c in channel_ids.split(",") if c.strip()]
+        al_list = [a.strip().lower() for a in aliases.split(",") if a.strip()]
+        if pid not in al_list:
+            al_list.insert(0, pid)
+        entry = {
+            "id": pid,
+            "name": name.strip() or pid,
+            "path": path.strip(),
+            "channel_ids": ch_list,
+            "aliases": al_list,
+        }
+        updated = False
+        for i, p in enumerate(projects):
+            if str(p.get("id", "")).lower() == pid:
+                projects[i] = entry
+                updated = True
+                break
+        if not updated:
+            projects.append(entry)
+        cfg["projects"] = projects
+        save_local_projects(cfg)
+        return json.dumps({"ok": True, "action": "updated" if updated else "added", "project": entry}, ensure_ascii=False)
+
+    if action == "remove":
+        pid = project_id.strip().lower()
+        before = len(projects)
+        cfg["projects"] = [p for p in projects if str(p.get("id", "")).lower() != pid]
+        save_local_projects(cfg)
+        return json.dumps({"ok": len(cfg["projects"]) < before, "removed": pid})
+
+    return json.dumps({"ok": False, "error": f"Unknown action: {action}"})
 
 
 if __name__ == "__main__":

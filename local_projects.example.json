@@ -1,0 +1,19 @@
+{
+  "default_workspace": "D:\\DuAn_MacDinh",
+  "projects": [
+    {
+      "id": "youtube",
+      "name": "Youtube AI Documentary",
+      "path": "D:\\Projects\\Youtube_Multilingual_AI_Documentary",
+      "channel_ids": ["1572101960855724055"],
+      "aliases": ["youtube", "video", "phim", "shorts", "reels"]
+    },
+    {
+      "id": "web",
+      "name": "Web App Team",
+      "path": "D:\\Projects\\WebApp",
+      "channel_ids": [],
+      "aliases": ["web", "frontend", "backend", "api", "site"]
+    }
+  ]
+}

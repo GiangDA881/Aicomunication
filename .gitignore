@@ -1,5 +1,6 @@
 .env
 .env.local
+local_projects.json
 __pycache__/
 *.pyc
 *.pyo
