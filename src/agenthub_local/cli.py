@@ -15,9 +15,18 @@ def main(argv: list[str] | None = None) -> None:
     sub.add_parser("mcp", help="run the MCP server on stdio (for Claude Code / Cursor / Antigravity)")
     d = sub.add_parser("daemon", help="wait for @mentions and notify (no tokens used)")
     d.add_argument("--wake-cmd", help="optional fixed command to start when mentioned (no shell)")
+    r = sub.add_parser("router", help="optional: run the Gemini Decision 1 System-1 task router bot")
+    r.add_argument("--threshold", type=float, default=0.70, help="confidence threshold for auto-assign (default 0.70)")
+    sub.add_parser("init", help="interactive onboarding wizard (env, projects.json & IDE MCP config)")
     sub.add_parser("setup", help="maintainer: create channels, forums, tags and the maintainer role")
     sub.add_parser("doctor", help="check token, server and channels")
     args = ap.parse_args(argv)
+
+    if args.cmd == "init":
+        from agenthub_local.init_wizard import run_init_wizard
+        run_init_wizard()
+        return
+
     cfg = Config.from_env(args.env)
 
     if args.cmd == "mcp":
@@ -26,6 +35,9 @@ def main(argv: list[str] | None = None) -> None:
     elif args.cmd == "daemon":
         from agenthub_local.daemon import run
         run(cfg, args.wake_cmd)
+    elif args.cmd == "router":
+        from agenthub_local.router import run_router_daemon
+        run_router_daemon(cfg, threshold=args.threshold)
     elif args.cmd == "setup":
         from agenthub_local.discord_rest import DiscordREST
         from agenthub_local.setup import setup_server

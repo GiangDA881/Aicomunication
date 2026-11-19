@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import shlex
 import time
 from collections import defaultdict, deque
@@ -23,6 +24,7 @@ from agenthub_local.config import Config
 from agenthub_local.hub import meta_of
 from agenthub_local.inbox import Inbox
 from agenthub_local.notify import notify
+from agenthub_local.projects import ProjectRegistry
 
 log = logging.getLogger("agenthub.daemon")
 WAKE_LIMIT, WAKE_WINDOW = 5, 600
@@ -75,15 +77,21 @@ class WakeDaemon(discord.Client):
             log.info("ignored mention from %s (hop %s / rate limit)", m.author, hop)
             return
         channel_name = getattr(m.channel, "name", "")
-        self.inbox.append({"id": str(m.id), "channel_id": str(m.channel.id), "channel": channel_name,
-                           "author": m.author.name, "author_id": str(m.author.id), "bot": m.author.bot,
-                           "hop": hop, "content": m.content[:3000], "url": m.jump_url,
-                           "ts": m.created_at.isoformat()})
+        ws = ProjectRegistry(self.cfg.home, self.cfg.upload_root).resolve(str(m.channel.id), m.content or "")
+        item = {"id": str(m.id), "channel_id": str(m.channel.id), "channel": channel_name,
+                "author": m.author.name, "author_id": str(m.author.id), "bot": m.author.bot,
+                "hop": hop, "content": m.content[:3000], "url": m.jump_url,
+                "ts": m.created_at.isoformat()}
+        if ws.get("workspace_path"):
+            item["project_id"] = ws["project_id"]
+            item["workspace_path"] = ws["workspace_path"]
+        self.inbox.append(item)
         try:
             await m.add_reaction("👀")
         except discord.HTTPException:
             pass
-        notify(f"{m.author.display_name} → {self.user.name}", m.clean_content[:200])
+        proj_tag = f" [{ws['project_name']}]" if ws.get("project_name") else ""
+        notify(f"{m.author.display_name} → {self.user.name}{proj_tag}", m.clean_content[:200])
         if self.wake_cmd:
             # Fixed argv, no shell, message text NOT passed: the agent reads it from the inbox.
             await asyncio.create_subprocess_exec(*self.wake_cmd, stdout=asyncio.subprocess.DEVNULL,
@@ -92,4 +100,13 @@ class WakeDaemon(discord.Client):
 
 def run(cfg: Config, wake_cmd: str | None = None) -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
-    WakeDaemon(cfg, shlex.split(wake_cmd) if wake_cmd else None).run(cfg.token, log_handler=None)
+    cfg.home.mkdir(parents=True, exist_ok=True)
+    pid_file = cfg.home / "daemon.pid"
+    pid_file.write_text(str(os.getpid()), encoding="utf-8")
+    try:
+        WakeDaemon(cfg, shlex.split(wake_cmd) if wake_cmd else None).run(cfg.token, log_handler=None)
+    finally:
+        try:
+            pid_file.unlink(missing_ok=True)
+        except OSError:
+            pass

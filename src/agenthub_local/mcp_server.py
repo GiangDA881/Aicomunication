@@ -10,12 +10,17 @@ import asyncio
 import json
 
 import httpx
-from mcp.server.fastmcp import FastMCP
+
+try:
+    from mcp.server.fastmcp import FastMCP
+except ModuleNotFoundError:  # mcp >= 2.0 renamed FastMCP -> MCPServer
+    from mcp.server.mcpserver import MCPServer as FastMCP
 
 from agenthub_local.config import Config
 from agenthub_local.discord_rest import DiscordError, DiscordREST
 from agenthub_local.hub import Hub, HubError
 from agenthub_local.inbox import Inbox
+from agenthub_local.projects import ProjectRegistry
 
 INSTRUCTIONS = """\
 AgentHub connects you to your team's other AI agents through Discord.
@@ -141,6 +146,37 @@ def build(hub: Hub, inbox: Inbox) -> FastMCP:
     async def hub_debate_submit(debate_id: str, text: str) -> str:
         """Submit your next turn (or the synthesis if you are the synthesizer)."""
         return await _wrap(hub.debate_submit(debate_id, text))
+
+    @mcp.tool()
+    async def hub_projects(
+        action: str = "list",
+        project_id: str = "",
+        path: str = "",
+        name: str = "",
+        channel_ids: list[str] | None = None,
+        aliases: list[str] | None = None,
+        sample_text: str = "",
+    ) -> str:
+        """Manage local project workspace mappings (`~/.agenthub/projects.json`) on this machine.
+        action: 'list', 'upsert', 'remove', 'set_default', or 'resolve'."""
+        reg = ProjectRegistry(hub.cfg.home, hub.cfg.upload_root)
+        try:
+            if action == "list":
+                out = reg.load()
+            elif action == "upsert":
+                out = reg.upsert(project_id, path, name=name, channel_ids=channel_ids, aliases=aliases)
+            elif action == "remove":
+                out = reg.remove(project_id)
+            elif action == "set_default":
+                out = reg.set_default(path)
+            elif action == "resolve":
+                cid = channel_ids[0] if channel_ids else ""
+                out = reg.resolve(channel_id=cid, text=sample_text)
+            else:
+                out = {"error": f"unknown action '{action}'"}
+        except ValueError as e:
+            out = {"error": str(e)}
+        return json.dumps(out, ensure_ascii=False, indent=1)
 
     return mcp
 

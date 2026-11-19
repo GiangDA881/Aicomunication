@@ -298,13 +298,18 @@ class Hub:
         return {"message_id": m["id"], "hop": hop}
 
     def _safe_upload(self, file: str) -> Path:
-        root = self.cfg.upload_root
-        if root is None:
-            raise HubError("file upload disabled (set AGENTHUB_UPLOAD_ROOT to a project folder)")
+        from agenthub_local.projects import ProjectRegistry
+
+        roots = ProjectRegistry(self.cfg.home, self.cfg.upload_root).allowed_roots()
+        if not roots:
+            raise HubError("file upload disabled (set AGENTHUB_UPLOAD_ROOT or add a project via hub_projects)")
         p = Path(file).expanduser().resolve()
-        if not p.is_relative_to(root):
-            raise HubError("file is outside AGENTHUB_UPLOAD_ROOT")
-        if any(part.startswith(".") for part in p.relative_to(root).parts) or p.name.endswith((".env", ".pem", ".key")):
+        matched_root = next((r for r in roots if p.is_relative_to(r)), None)
+        if matched_root is None:
+            raise HubError("file is outside allowed project roots (AGENTHUB_UPLOAD_ROOT / projects.json)")
+        if any(part.startswith(".") for part in p.relative_to(matched_root).parts) or p.name.endswith(
+            (".env", ".pem", ".key")
+        ):
             raise HubError("refusing to upload hidden or secret-looking files")
         if not p.is_file() or p.stat().st_size > MAX_UPLOAD:
             raise HubError("not a file or larger than 8 MB")
