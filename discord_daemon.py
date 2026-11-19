@@ -70,6 +70,8 @@ class TeamDiscordDaemon:
         self.session_id: Optional[str] = None
         self.running: bool = True
         self._recent_ai_hops: int = 0
+        self._hb_acked: bool = True
+        self._hb_count: int = 0
 
     def _reload_settings(self) -> None:
         self.settings = load_settings()
@@ -357,19 +359,63 @@ class TeamDiscordDaemon:
         # Default: just log to history
         self._save_message(msg_id, channel_id, author_name, author_id, is_bot, content, attachments)
 
+    def _presence_payload(self) -> Dict[str, Any]:
+        return {
+            "since": None,
+            "status": "online",
+            "afk": False,
+            "activities": [{"name": f"{self.settings.agent_name} · Team AI", "type": 3}],
+        }
+
     async def _heartbeat_loop(self, ws, interval_sec: float) -> None:
+        # First heartbeat after short jitter per Discord Gateway v10 spec
+        await asyncio.sleep(min(5.0, interval_sec * 0.25))
         while self.running:
-            await asyncio.sleep(interval_sec)
+            if not self._hb_acked:
+                log("ZOMBIE_SOCKET detected (missed Discord HEARTBEAT_ACK); forcing immediate reconnect...")
+                try:
+                    await ws.close(code=4000, reason="Heartbeat ACK timeout")
+                except Exception:
+                    pass
+                break
+            self._hb_acked = False
+            self._hb_count += 1
             try:
                 await ws.send(json.dumps({"op": 1, "d": self.seq}))
+                # Refresh Online presence every ~4 minutes so Discord never drops green dot
+                if self._hb_count % 6 == 0:
+                    await ws.send(json.dumps({"op": 3, "d": self._presence_payload()}))
             except Exception:
                 break
+            await asyncio.sleep(interval_sec)
+
+    def _stop_existing_daemon(self) -> None:
+        """Terminate any older daemon PID so two sessions never fight over Discord Online presence."""
+        if not PID_PATH.exists():
+            return
+        try:
+            old_pid = int(PID_PATH.read_text(encoding="utf-8").strip())
+            if old_pid and old_pid != os.getpid():
+                if sys.platform == "win32":
+                    import subprocess
+                    subprocess.run(
+                        ["taskkill", "/PID", str(old_pid), "/F"],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                        check=False,
+                    )
+                else:
+                    os.kill(old_pid, signal.SIGTERM)
+                time.sleep(0.4)
+        except Exception:
+            pass
 
     async def run_forever(self) -> None:
+        self._stop_existing_daemon()
         PID_PATH.write_text(str(os.getpid()), encoding="utf-8")
         set_agent_status(self.settings.agent_name, "IDLE", "Daemon online")
         log(
-            f"Starting TeamDiscordDaemon | agent={self.settings.agent_name} | "
+            f"Starting TeamDiscordDaemon | pid={os.getpid()} | agent={self.settings.agent_name} | "
             f"channels={self.settings.channel_ids} | is_router={self.settings.is_router} | "
             f"use_decision={self.settings.use_gemini_decision}"
         )
@@ -378,8 +424,16 @@ class TeamDiscordDaemon:
         while self.running:
             hb_task = None
             try:
-                async with websockets.connect(GATEWAY_URL, max_size=8 * 1024 * 1024, ping_interval=None) as ws:
+                async with websockets.connect(
+                    GATEWAY_URL,
+                    max_size=8 * 1024 * 1024,
+                    ping_interval=20,
+                    ping_timeout=15,
+                    close_timeout=5,
+                ) as ws:
                     backoff = 2.0
+                    self._hb_acked = True
+                    self._hb_count = 0
                     # 1. Receive HELLO (op=10)
                     hello = json.loads(await ws.recv())
                     hb_interval = hello["d"]["heartbeat_interval"] / 1000.0
@@ -392,17 +446,7 @@ class TeamDiscordDaemon:
                             "token": self.settings.bot_token,
                             "intents": GATEWAY_INTENTS,
                             "properties": {"os": "windows", "browser": "team-discord-mcp", "device": "team-discord-mcp"},
-                            "presence": {
-                                "since": None,
-                                "status": "online",
-                                "afk": False,
-                                "activities": [
-                                    {
-                                        "name": f"{self.settings.agent_name} · Team AI",
-                                        "type": 3,
-                                    }
-                                ],
-                            },
+                            "presence": self._presence_payload(),
                         },
                     }
                     await ws.send(json.dumps(identify))
@@ -418,22 +462,17 @@ class TeamDiscordDaemon:
                         t = pkt.get("t")
                         d = pkt.get("d")
 
-                        if op == 0:
+                        if op == 11:  # HEARTBEAT_ACK
+                            self._hb_acked = True
+                        elif op == 1:  # Server requests immediate heartbeat
+                            await ws.send(json.dumps({"op": 1, "d": self.seq}))
+                        elif op == 0:
                             if t == "READY":
                                 self.session_id = d.get("session_id")
                                 u = d.get("user") or {}
                                 self.bot_user_id = str(u.get("id", ""))
-                                log(f"CONNECTED to Discord Gateway as {u.get('username')} ({self.bot_user_id})")
-                                # Explicitly push op=3 Presence Update so Discord shows green Online dot immediately
-                                await ws.send(json.dumps({
-                                    "op": 3,
-                                    "d": {
-                                        "since": None,
-                                        "status": "online",
-                                        "afk": False,
-                                        "activities": [{"name": f"{self.settings.agent_name} · Team AI", "type": 3}],
-                                    },
-                                }))
+                                log(f"CONNECTED to Discord Gateway as {u.get('username')} ({self.bot_user_id}) [ONLINE]")
+                                await ws.send(json.dumps({"op": 3, "d": self._presence_payload()}))
                             elif t == "MESSAGE_CREATE":
                                 asyncio.create_task(self.handle_message_create(d))
                         elif op == 7:  # RECONNECT
