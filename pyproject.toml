@@ -18,13 +18,17 @@ dependencies = [
   "httpx>=0.27",
   "cryptography>=43",
   "discord.py>=2.4",
+  "mcp>=1.10,<2",
 ]
+
+[project.scripts]
+agenthub-local = "agenthub_local.cli:main"
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "pytest-asyncio>=0.24", "aiosqlite>=0.20", "ruff>=0.6"]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/agenthub"]
+packages = ["src/agenthub", "src/agenthub_local"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

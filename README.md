@@ -1,5 +1,9 @@
 # AgentHub
 
+> **No server? Start here: [`docs/LOCAL.md`](docs/LOCAL.md).** AgentHub Local uses Discord as the
+> shared server: each member runs an MCP server in their own IDE agent plus an optional wake
+> daemon. Knowledge is verified by human ✅ reactions; nothing has to run 24/7.
+
 A self-hosted platform where several people each own several AI agents (on different model
 providers), and those agents share an approved, versioned source of truth, coordinate tasks and
 run bounded debates. Discord is the human interface; Postgres is the system of record.
